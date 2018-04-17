@@ -28,7 +28,7 @@ def main():
                         help='Number of sweeps over the dataset to train')
     parser.add_argument('--gpu', '-g', type=int, default=-1,
                         help='GPU ID (negative value indicates CPU)')
-    parser.add_argument('--dataset', '-i', default=Path.home() / 'study/dataset/categorical_rgbd_flatten_split',
+    parser.add_argument('--dataset', '-i', default='data/mug',
                         help='Directory of image files.')
     parser.add_argument('--out', '-o', default='result',
                         help='Directory to output the result')
@@ -70,8 +70,8 @@ def main():
     opt_dec = make_optimizer(dec)
     opt_dis = make_optimizer(dis)
 
-    train_d = MugFaceDataset(args.dataset / "train")
-    test_d  = MugFaceDataset(args.dataset / "test")
+    train_d = MugFaceDataset(Path(args.dataset) / "train")
+    test_d  = MugFaceDataset(Path(args.dataset) / "test")
     # train_d = FacadeDataset(args.dataset, data_range=(1,300))
     # test_d = FacadeDataset(args.dataset, data_range=(300,379))
     #train_iter = chainer.iterators.MultiprocessIterator(train_d, args.batchsize, n_processes=4)
@@ -111,7 +111,7 @@ def main():
         out_image(
             updater, enc, dec,
             5, 5, args.seed, args.out),
-        trigger=snapshot_interval)
+            trigger=snapshot_interval)
 
     if args.resume:
         # Resume from a snapshot
