@@ -38,6 +38,8 @@ def main():
                         help='Random seed')
     parser.add_argument('--snapshot_interval', type=int, default=1000,
                         help='Interval of snapshot')
+    parser.add_argument('--generate_interval', type=int, default=200,
+                        help='Interval of generate samples')
     parser.add_argument('--display_interval', type=int, default=100,
                         help='Interval of displaying log to console')
     args = parser.parse_args()
@@ -92,6 +94,7 @@ def main():
     trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
 
     snapshot_interval = (args.snapshot_interval, 'iteration')
+    generate_interval = (args.generate_interval, 'iteration')
     display_interval = (args.display_interval, 'iteration')
     trainer.extend(extensions.snapshot(
         filename='snapshot_iter_{.updater.iteration}.npz'),
@@ -111,7 +114,7 @@ def main():
         out_image(
             updater, enc, dec,
             5, 5, args.seed, args.out),
-            trigger=snapshot_interval)
+            trigger=generate_interval)
 
     if args.resume:
         # Resume from a snapshot
