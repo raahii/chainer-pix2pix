@@ -54,4 +54,32 @@ class FacadeDataset(dataset_mixin.DatasetMixin):
         y_l = np.random.randint(0,h-crop_width)
         y_r = y_l+crop_width
         return self.dataset[i][1][:,y_l:y_r,x_l:x_r], self.dataset[i][0][:,y_l:y_r,x_l:x_r]
+
+class MugFaceDataset(dataset_mixin.DatasetMixin):
+    def __init__(self, path):
+        self.dataset = []
+        self.depth_frames = list(path.glob("**/user*/depth/*.jpg"))
+        self.rgb_frames = list(path.glob("**/user*/rgb/*.jpg"))
+    
+    def __len__(self):
+        return len(self.rgb_frames)
+
+    # return (label, img)
+    def get_example(self, i, crop_width=256):
+        img = Image.open(str(self.depth_frames[i]))
+        label = Image.open(str(self.rgb_frames[i]))
+        w, h = img.size
+        assert w == h
+
+        # resize images so that min(w, h) == 286
+        r = crop_width / w
+        img   = img.resize((int(r*w), int(r*h)), Image.BILINEAR)
+        label = label.resize((int(r*w), int(r*h)), Image.BILINEAR)
+
+        img = np.asarray(img).astype("f")
+        img = np.expand_dims(img, axis=2)
+        img = img.transpose(2,0,1)/128.0-1.0
+        label = np.asarray(label).astype("f").transpose(2,0,1)/128.0-1.0
+
+        return img, label
     
