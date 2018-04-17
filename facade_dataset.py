@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import numpy
 from PIL import Image
@@ -22,11 +23,12 @@ class FacadeDataset(dataset_mixin.DatasetMixin):
         print("load dataset start")
         print("    from: %s"%dataDir)
         print("    range: [%d, %d)"%(data_range[0], data_range[1]))
+        dataDir = Path(dataDir)
         self.dataDir = dataDir
         self.dataset = []
         for i in range(data_range[0],data_range[1]):
-            img = Image.open(dataDir+"/cmp_b%04d.jpg"%i)
-            label = Image.open(dataDir+"/cmp_b%04d.png"%i)
+            img = Image.open(str(dataDir / ("cmp_b%04d.jpg"%i)))
+            label = Image.open(str(dataDir / ("cmp_b%04d.png"%i)))
             w,h = img.size
             r = 286 / float(min(w,h))
             # resize images so that min(w, h) == 286
