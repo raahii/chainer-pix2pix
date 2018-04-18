@@ -16,8 +16,8 @@ def out_image(updater, enc, dec, rows, cols, seed, dst):
         n_images = rows * cols
         xp = enc.xp
         
-        w_in = 256
-        w_out = 256
+        w_in = 64
+        w_out = 64
         in_ch = 1
         out_ch = 3
         
@@ -49,7 +49,6 @@ def out_image(updater, enc, dec, rows, cols, seed, dst):
                 in_all[it,:] = x_in.data.get()[0,:]
                 gt_all[it,:] = t_out.get()[0,:]
                 gen_all[it,:] = x_out.data.get()[0,:]
-        
         
         def save_image(x, name, mode=None):
             _, C, H, W = x.shape

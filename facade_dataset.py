@@ -68,13 +68,6 @@ class MugFaceDataset(dataset_mixin.DatasetMixin):
     def get_example(self, i, crop_width=256):
         img = Image.open(str(self.depth_frames[i]))
         label = Image.open(str(self.rgb_frames[i]))
-        w, h = img.size
-        assert w == h
-
-        # resize images so that min(w, h) == 286
-        r = crop_width / w
-        img   = img.resize((int(r*w), int(r*h)), Image.BILINEAR)
-        label = label.resize((int(r*w), int(r*h)), Image.BILINEAR)
 
         img = np.asarray(img).astype("f")
         img = np.expand_dims(img, axis=2)
