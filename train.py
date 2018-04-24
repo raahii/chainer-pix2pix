@@ -17,8 +17,10 @@ from net import Encoder
 from net import Decoder
 from updater import FacadeUpdater
 
-from facade_dataset import FacadeDataset, MugFaceDataset
-from facade_visualizer import out_image
+from dataset import FacadeDataset, MugFaceDataset
+from visualizer import out_image
+from tb_chainer import utils, SummaryWriter
+from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(description='chainer implementation of pix2pix')
@@ -30,30 +32,29 @@ def main():
                         help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--dataset', '-i', default='data/mug',
                         help='Directory of image files.')
+    parser.add_argument('--lam1', type=int, default=100,
+                        help='lambda1')
+    parser.add_argument('--lam2', type=int, default=1,
+                        help='lambda2')
     parser.add_argument('--out', '-o', default='result',
                         help='Directory to output the result')
     parser.add_argument('--resume', '-r', default='',
                         help='Resume the training from snapshot')
     parser.add_argument('--seed', type=int, default=0,
                         help='Random seed')
-    parser.add_argument('--snapshot_interval', type=int, default=1000,
-                        help='Interval of snapshot')
-    parser.add_argument('--generate_interval', type=int, default=200,
-                        help='Interval of generate samples')
-    parser.add_argument('--display_interval', type=int, default=100,
-                        help='Interval of displaying log to console')
+    parser.add_argument('--snapshot_interval', type=int, default=5,
+                        help='Interval of snapshot (epoch)')
+    parser.add_argument('--generate_interval', type=int, default=1,
+                        help='Interval of generate samples (epoch)')
+    parser.add_argument('--display_interval', type=int, default=1000,
+                        help='Interval of displaying log to console (iter)')
     args = parser.parse_args()
 
-    print('GPU: {}'.format(args.gpu))
-    print('# Minibatch-size: {}'.format(args.batchsize))
-    print('# epoch: {}'.format(args.epoch))
-    print('')
-
     # Set up a neural network to train
-    enc = Encoder(in_ch=1)
-    dec = Decoder(out_ch=3)
-    # enc = Encoder(in_ch=12)
-    # dec = Decoder(out_ch=3)
+    in_ch = 1
+    out_ch = 3
+    enc = Encoder(in_ch=in_ch)
+    dec = Decoder(out_ch=out_ch)
     dis = Discriminator(in_ch=1, out_ch=3)
     
     if args.gpu >= 0:
@@ -68,18 +69,20 @@ def main():
         optimizer.setup(model)
         optimizer.add_hook(chainer.optimizer.WeightDecay(0.00001), 'hook_dec')
         return optimizer
+
     opt_enc = make_optimizer(enc)
     opt_dec = make_optimizer(dec)
     opt_dis = make_optimizer(dis)
 
     train_d = MugFaceDataset(Path(args.dataset) / "train")
     test_d  = MugFaceDataset(Path(args.dataset) / "test")
-    # train_d = FacadeDataset(args.dataset, data_range=(1,300))
-    # test_d = FacadeDataset(args.dataset, data_range=(300,379))
-    #train_iter = chainer.iterators.MultiprocessIterator(train_d, args.batchsize, n_processes=4)
-    #test_iter = chainer.iterators.MultiprocessIterator(test_d, args.batchsize, n_processes=4)
     train_iter = chainer.iterators.SerialIterator(train_d, args.batchsize)
     test_iter = chainer.iterators.SerialIterator(test_d, args.batchsize)
+
+    # tensorboard writer
+    rpath = Path(args.out)
+    tensorboard_path = rpath.parents[0] / 'runs' / rpath.name
+    writer = SummaryWriter(str(tensorboard_path))
 
     # Set up a trainer
     updater = FacadeUpdater(
@@ -90,11 +93,15 @@ def main():
         optimizer={
             'enc': opt_enc, 'dec': opt_dec, 
             'dis': opt_dis},
-        device=args.gpu)
+        device=args.gpu,
+        tensorboard=writer,
+        lam1=args.lam1,
+        lam2=args.lam2,
+        )
     trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
 
-    snapshot_interval = (args.snapshot_interval, 'iteration')
-    generate_interval = (args.generate_interval, 'iteration')
+    snapshot_interval = (args.snapshot_interval, 'epoch')
+    generate_interval = (args.generate_interval, 'epoch')
     display_interval = (args.display_interval, 'iteration')
     trainer.extend(extensions.snapshot(
         filename='snapshot_iter_{.updater.iteration}.npz'),
@@ -113,15 +120,46 @@ def main():
     trainer.extend(
         out_image(
             updater, enc, dec,
-            5, 5, args.seed, args.out),
+            5, 5, args.seed, args.out, writer),
             trigger=generate_interval)
 
     if args.resume:
         # Resume from a snapshot
         chainer.serializers.load_npz(args.resume, trainer)
+    
+    # Print params
+    params = {
+        'host': os.uname()[1],
+        'gpu': args.gpu,
+        # 'task': task,
+        'epoch' : args.epoch,
+        'save_dir': args.out,
+        'batchsize': args.batchsize,
+        'input_channels': in_ch,
+        'output_channels': out_ch,
+        'lamda1': args.lam1,
+        'lamda2': args.lam2,
+        'patch_shape_discriminator':  (1,4,4),
+        'generate_interval': "{} epochs".format(args.generate_interval),
+        'snapshot_interval': "{} iters".format(args.snapshot_interval),
+        'display_interval': "{} iters".format(args.display_interval),
+        'tensorboard': str(tensorboard_path),
+    }
+    
+    print('')
+    for key, val in params.items():
+        print('# {}: {}'.format(key, val))
+    print('')
 
     # Run the training
     trainer.run()
+    
+    # Save the trained model
+    chainer.serializers.save_npz(str(Path(args.out)/'enc_fianl.npz'), enc)
+    chainer.serializers.save_npz(str(Path(args.out)/'dec_fianl.npz'), dec)
+    chainer.serializers.save_npz(str(Path(args.out)/'dis_fianl.npz'), dis)
+
+
 
 if __name__ == '__main__':
     main()

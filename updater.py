@@ -15,26 +15,31 @@ from chainer.utils import type_check
 import numpy
 
 class FacadeUpdater(chainer.training.StandardUpdater):
-
     def __init__(self, *args, **kwargs):
         self.enc, self.dec, self.dis = kwargs.pop('models')
+        self.tensorboard = kwargs.pop('tensorboard')
+        self.lam1 = kwargs.pop('lam1')
+        self.lam2 = kwargs.pop('lam2')
         super(FacadeUpdater, self).__init__(*args, **kwargs)
 
-
-    def loss_enc(self, enc, x_out, t_out, y_out, lam1=100, lam2=1):
+    def loss_enc(self, enc, x_out, t_out, y_out):
         batchsize,_,w,h = y_out.data.shape
-        loss_rec = lam1*(F.mean_absolute_error(x_out, t_out))
-        loss_adv = lam2*F.sum(F.softplus(-y_out)) / batchsize / w / h
+        loss_rec = self.lam1*(F.mean_absolute_error(x_out, t_out))
+        loss_adv = self.lam2*F.sum(F.softplus(-y_out)) / batchsize / w / h
         loss = loss_rec + loss_adv
         chainer.report({'loss': loss}, enc)
+        if self.is_new_epoch:
+            self.tensorboard.add_scalar('loss:encoder', loss.data, self.epoch)
         return loss
         
-    def loss_dec(self, dec, x_out, t_out, y_out, lam1=100, lam2=1):
+    def loss_dec(self, dec, x_out, t_out, y_out):
         batchsize,_,w,h = y_out.data.shape
-        loss_rec = lam1*(F.mean_absolute_error(x_out, t_out))
-        loss_adv = lam2*F.sum(F.softplus(-y_out)) / batchsize / w / h
+        loss_rec = self.lam1*(F.mean_absolute_error(x_out, t_out))
+        loss_adv = self.lam2*F.sum(F.softplus(-y_out)) / batchsize / w / h
         loss = loss_rec + loss_adv
         chainer.report({'loss': loss}, dec)
+        if self.is_new_epoch:
+            self.tensorboard.add_scalar('loss:decoder', loss.data, self.epoch)
         return loss
         
         
@@ -45,6 +50,8 @@ class FacadeUpdater(chainer.training.StandardUpdater):
         L2 = F.sum(F.softplus(y_out)) / batchsize / w / h
         loss = L1 + L2
         chainer.report({'loss': loss}, dis)
+        if self.is_new_epoch:
+            self.tensorboard.add_scalar('loss:discriminator', loss.data, self.epoch)
         return loss
 
     def update_core(self):

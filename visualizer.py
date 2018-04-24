@@ -9,7 +9,7 @@ import chainer
 import chainer.cuda
 from chainer import Variable
 
-def out_image(updater, enc, dec, rows, cols, seed, dst):
+def out_image(updater, enc, dec, rows, cols, seed, dst, tensorboard):
     @chainer.training.make_extension()
     def make_image(trainer):
         np.random.seed(seed)
@@ -65,15 +65,18 @@ def out_image(updater, enc, dec, rows, cols, seed, dst):
             if not os.path.exists(preview_dir):
                 os.makedirs(preview_dir)
             Image.fromarray(x, mode=mode).convert('RGB').save(preview_path)
+
+            # from here, conert x for logging to tensorboard
+            if x.ndim == 3:
+                x = x.transpose(2, 0, 1)
+            else:
+                x = np.tile(np.expand_dims(x, 0), (3,1,1))
+            x = x / 255.
+            tensorboard.add_image(name, x, updater.epoch)
         
         x = np.asarray(np.clip(gen_all * 128 + 128, 0.0, 255.0), dtype=np.uint8)
         save_image(x, "gen")
         
-        # x = np.ones((n_images, 3, w_in, w_in)).astype(np.uint8)*255
-        # x[:,0,:,:] = 0
-        # for i in range(12):
-        #     x[:,0,:,:] += np.uint8(15*i*in_all[:,i,:,:])
-        # save_image(x, "in", mode='HSV')
         x = np.asarray(np.clip(in_all * 128 + 128, 0.0, 255.0), dtype=np.uint8)
         save_image(x, "in")
         
