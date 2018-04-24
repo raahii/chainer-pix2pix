@@ -58,7 +58,7 @@ class FacadeUpdater(chainer.training.StandardUpdater):
         t_out = xp.asarray(t_out)
         batchsize = len(x_in)
 
-        x_in_with_noise = Variable(enc.concat_noise(x_in, xp=xp))
+        x_in_with_noise = Variable(enc.concat_noise(x_in))
         bottleneck = enc(x_in_with_noise)
         x_out = dec(bottleneck)
 

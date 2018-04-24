@@ -61,8 +61,9 @@ class Encoder(chainer.Chain):
     def make_hidden(self, batchsize, size):
         return np.random.normal(0, 0.33, size=[batchsize, size]).astype(np.float32)
 
-    def concat_noise(self, x_in, z_c=None, xp=np):
+    def concat_noise(self, x_in, z_c=None):
         # concat noise as additional channel of image
+        xp = chainer.cuda.get_array_module(x_in.data)
         B, C, H, W = x_in.shape
         if z_c is None:
             z_c = xp.asarray(self.make_hidden(B, self.dim_z))

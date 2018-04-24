@@ -33,7 +33,7 @@ def out_image(updater, enc, dec, rows, cols, seed, dst, tensorboard):
             
             z_c = np.asarray(enc.make_hidden(batchsize, 1))
             z_c = np.tile(z_c, (1, enc.dim_z))
-            x_in_with_noise = Variable(enc.concat_noise(x_in, z_c=z_c, xp=xp))
+            x_in_with_noise = Variable(enc.concat_noise(x_in, z_c=z_c))
             x_in = Variable(x_in)
 
             bottleneck = enc(x_in_with_noise)
