@@ -1,18 +1,10 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
-
 import chainer
 import chainer.functions as F
 from chainer import Variable
 
-import numpy as np
-from PIL import Image
-
 from chainer import cuda
 from chainer import function
-from chainer.utils import type_check
-import numpy
+from chainer.dataset import concat_examples
 
 class FacadeUpdater(chainer.training.StandardUpdater):
     def __init__(self, *args, **kwargs):
@@ -42,7 +34,6 @@ class FacadeUpdater(chainer.training.StandardUpdater):
             self.tensorboard.add_scalar('loss:decoder', loss.data, self.epoch)
         return loss
         
-        
     def loss_dis(self, dis, y_in, y_out):
         batchsize,_,w,h = y_in.data.shape
         
@@ -62,31 +53,22 @@ class FacadeUpdater(chainer.training.StandardUpdater):
         enc, dec, dis = self.enc, self.dec, self.dis
         xp = enc.xp
 
-        batch = self.get_iterator('main').next()
-        batchsize = len(batch)
-        in_ch = batch[0][0].shape[0]
-        out_ch = batch[0][1].shape[0]
-        w_in = 64
-        w_out = 64
-        
-        x_in = xp.zeros((batchsize, in_ch, w_in, w_in)).astype("f")
-        t_out = xp.zeros((batchsize, out_ch, w_out, w_out)).astype("f")
-        
-        for i in range(batchsize):
-            x_in[i,:] = xp.asarray(batch[i][0])
-            t_out[i,:] = xp.asarray(batch[i][1])
-        x_in = Variable(x_in)
-        
-        z = enc(x_in)
-        x_out = dec(z)
+        x_in, t_out = concat_examples(self.get_iterator('main').next())
+        x_in = xp.asarray(x_in)
+        t_out = xp.asarray(t_out)
+        batchsize = len(x_in)
 
+        x_in_with_noise = Variable(enc.concat_noise(x_in, xp=xp))
+        bottleneck = enc(x_in_with_noise)
+        x_out = dec(bottleneck)
+
+        x_in = Variable(x_in)
         y_fake = dis(x_in, x_out)
         y_real = dis(x_in, t_out)
 
-
         enc_optimizer.update(self.loss_enc, enc, x_out, t_out, y_fake)
-        for z_ in z:
-            z_.unchain_backward()
+        for bottleneck_ in bottleneck:
+            bottleneck_.unchain_backward()
         dec_optimizer.update(self.loss_dec, dec, x_out, t_out, y_fake)
         x_in.unchain_backward()
         x_out.unchain_backward()

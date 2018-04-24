@@ -36,6 +36,8 @@ def main():
                         help='lambda1')
     parser.add_argument('--lam2', type=int, default=1,
                         help='lambda2')
+    parser.add_argument('--dim_z', type=int, default=10,
+                        help='dimension of noize vector z')
     parser.add_argument('--out', '-o', default='result',
                         help='Directory to output the result')
     parser.add_argument('--resume', '-r', default='',
@@ -51,9 +53,9 @@ def main():
     args = parser.parse_args()
 
     # Set up a neural network to train
-    in_ch = 1
+    in_ch = 1 + args.dim_z
     out_ch = 3
-    enc = Encoder(in_ch=in_ch)
+    enc = Encoder(in_ch=in_ch, dim_z=args.dim_z)
     dec = Decoder(out_ch=out_ch)
     dis = Discriminator(in_ch=1, out_ch=3)
     
@@ -104,14 +106,14 @@ def main():
     generate_interval = (args.generate_interval, 'epoch')
     display_interval = (args.display_interval, 'iteration')
     trainer.extend(extensions.snapshot(
-        filename='snapshot_iter_{.updater.iteration}.npz'),
+        filename='snapshot_iter_{.updater.epoch}.npz'),
                    trigger=snapshot_interval)
     trainer.extend(extensions.snapshot_object(
-        enc, 'enc_iter_{.updater.iteration}.npz'), trigger=snapshot_interval)
+        enc, 'enc_iter_{.updater.epoch}.npz'), trigger=snapshot_interval)
     trainer.extend(extensions.snapshot_object(
-        dec, 'dec_iter_{.updater.iteration}.npz'), trigger=snapshot_interval)
+        dec, 'dec_iter_{.updater.epoch}.npz'), trigger=snapshot_interval)
     trainer.extend(extensions.snapshot_object(
-        dis, 'dis_iter_{.updater.iteration}.npz'), trigger=snapshot_interval)
+        dis, 'dis_iter_{.updater.epoch}.npz'), trigger=snapshot_interval)
     trainer.extend(extensions.LogReport(trigger=display_interval))
     trainer.extend(extensions.PrintReport([
         'epoch', 'iteration', 'enc/loss', 'dec/loss', 'dis/loss',
@@ -158,8 +160,6 @@ def main():
     chainer.serializers.save_npz(str(Path(args.out)/'enc_fianl.npz'), enc)
     chainer.serializers.save_npz(str(Path(args.out)/'dec_fianl.npz'), dec)
     chainer.serializers.save_npz(str(Path(args.out)/'dis_fianl.npz'), dis)
-
-
 
 if __name__ == '__main__':
     main()

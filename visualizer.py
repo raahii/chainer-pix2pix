@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import os
 
 import numpy as np
@@ -8,6 +6,7 @@ from PIL import Image
 import chainer
 import chainer.cuda
 from chainer import Variable
+from chainer.dataset import concat_examples
 
 def out_image(updater, enc, dec, rows, cols, seed, dst, tensorboard):
     @chainer.training.make_extension()
@@ -21,25 +20,24 @@ def out_image(updater, enc, dec, rows, cols, seed, dst, tensorboard):
         in_ch = 1
         out_ch = 3
         
-        # in_all = np.zeros((n_images, in_ch, w_in, w_in)).astype("i")
         in_all = np.zeros((n_images, in_ch, w_in, w_in)).astype("f")
         gt_all = np.zeros((n_images, out_ch, w_out, w_out)).astype("f")
         gen_all = np.zeros((n_images, out_ch, w_out, w_out)).astype("f")
         
         for it in range(n_images):
-            batch = updater.get_iterator('test').next()
-            batchsize = len(batch)
+            x_in, t_out = concat_examples(updater.get_iterator('test').next())
 
-            x_in = xp.zeros((batchsize, in_ch, w_in, w_in)).astype("f")
-            t_out = xp.zeros((batchsize, out_ch, w_out, w_out)).astype("f")
-
-            for i in range(batchsize):
-                x_in[i,:] = xp.asarray(batch[i][0])
-                t_out[i,:] = xp.asarray(batch[i][1])
+            x_in = xp.asarray(x_in)
+            t_out = xp.asarray(t_out)
+            batchsize = len(x_in)
+            
+            z_c = np.asarray(enc.make_hidden(batchsize, 1))
+            z_c = np.tile(z_c, (1, enc.dim_z))
+            x_in_with_noise = Variable(enc.concat_noise(x_in, z_c))
             x_in = Variable(x_in)
 
-            z = enc(x_in)
-            x_out = dec(z)
+            bottleneck = enc(x_in_with_noise)
+            x_out = dec(bottleneck)
             
             if updater.device == -1:
                 in_all[it,:] = x_in.data[0,:]

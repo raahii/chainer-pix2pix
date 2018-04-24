@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 
-import numpy
+import numpy as np
 
 import chainer
 from chainer import cuda
@@ -38,7 +38,8 @@ class CBR(chainer.Chain):
         return h
     
 class Encoder(chainer.Chain):
-    def __init__(self, in_ch):
+    def __init__(self, in_ch, dim_z):
+        self.dim_z  = dim_z
         layers = {}
         w = chainer.initializers.Normal(0.02)
         layers['c0'] = L.Convolution2D(in_ch, 64, 3, 1, 1, initialW=w)
@@ -56,6 +57,18 @@ class Encoder(chainer.Chain):
             hs.append(self['c%d'%i](hs[i-1]))
 
         return hs
+
+    def make_hidden(self, batchsize, size):
+        return np.random.normal(0, 0.33, size=[batchsize, size]).astype(np.float32)
+
+    def concat_noise(self, x_in, z_c=None, xp=np):
+        # concat noise as additional channel of image
+        B, C, H, W = x_in.shape
+        if z_c is None:
+            z_c = xp.asarray(self.make_hidden(B, self.dim_z))
+        z_c_image = z_c.repeat(H*W).reshape(B, self.dim_z, H, W)
+
+        return xp.concatenate((x_in, z_c_image), 1)
 
 class Decoder(chainer.Chain):
     def __init__(self, out_ch):
@@ -80,7 +93,6 @@ class Decoder(chainer.Chain):
                 h = self.c6(h)
         return h
 
-    
 class Discriminator(chainer.Chain):
     def __init__(self, in_ch, out_ch):
         layers = {}
